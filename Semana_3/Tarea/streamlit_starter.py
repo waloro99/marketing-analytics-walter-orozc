@@ -74,7 +74,7 @@ def valor_de_la_politica(test_df, seleccionados):
     return valor_tratado - valor_control, len(sel)
 
 
-def curva_qini(test_df, score_col, steps=40):
+def curva_qini(test_df, score_col, steps=40, start=1):
     orden = test_df.sort_values(score_col, ascending=False).reset_index(drop=True)
     es_tratado = (orden["treatment_group"] == "treatment").values
     respondio = orden["responded_60d"].values
@@ -84,7 +84,7 @@ def curva_qini(test_df, score_col, steps=40):
     n_c = np.cumsum(~es_tratado)
     n = len(orden)
     xs, ys = [0.0], [0.0]
-    for i in np.linspace(1, n, steps).astype(int):
+    for i in np.linspace(start, n, steps).astype(int):
         tasa_t = acum_t[i - 1] / n_t[i - 1] if n_t[i - 1] > 0 else 0
         tasa_c = acum_c[i - 1] / n_c[i - 1] if n_c[i - 1] > 0 else 0
         xs.append(i / n)
@@ -143,13 +143,22 @@ xs_u, ys_u = curva_qini(test, "uplift_estimado")
 xs_r, ys_r = curva_qini(test, "prob_churn")
 qini_u = coeficiente_qini(xs_u, ys_u, len(test))
 qini_r = coeficiente_qini(xs_r, ys_r, len(test))
+# Para la gráfica se omite el punto calculado con un solo cliente (genera un pico artificial)
+inicio_grafica = len(test) // 40
+xs_u_g, ys_u_g = curva_qini(test, "uplift_estimado", start=inicio_grafica)
+xs_r_g, ys_r_g = curva_qini(test, "prob_churn", start=inicio_grafica)
+
+def dinero(v, decimales=2):
+    signo = "-" if v < 0 else "+"
+    return f"{signo}${abs(v):,.{decimales}f}"
+
 
 k1, k2, k3, k4 = st.columns(4)
-k1.metric(f"Valor total · top {pct_contactar}% por uplift", f"${v_uplift * n_sel:,.0f}",
-          f"${v_uplift:+.2f} por cliente")
-k2.metric(f"Valor total · top {pct_contactar}% por riesgo", f"${v_riesgo * n_sel:,.0f}",
-          f"${v_riesgo:+.2f} por cliente")
-k3.metric("Contactar a todos", f"${v_todos * n_todos:,.0f}", f"${v_todos:+.2f} por cliente")
+k1.metric(f"Valor total · top {pct_contactar}% por uplift", dinero(v_uplift * n_sel, 0),
+          f"{dinero(v_uplift)} por cliente")
+k2.metric(f"Valor total · top {pct_contactar}% por riesgo", dinero(v_riesgo * n_sel, 0),
+          f"{dinero(v_riesgo)} por cliente")
+k3.metric("Contactar a todos", dinero(v_todos * n_todos, 0), f"{dinero(v_todos)} por cliente")
 k4.metric("Coeficiente Qini", f"{qini_u:+.3f}", f"{qini_u - qini_r:+.3f} vs. riesgo")
 
 # --- Curva Qini ---
@@ -157,9 +166,9 @@ col_g, col_t = st.columns([3, 2])
 with col_g:
     st.subheader("Curva Qini")
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(xs_u, ys_u, color=GREEN, linewidth=3, label=f"T-learner (Qini={qini_u:+.3f})")
-    ax.plot(xs_r, ys_r, color=ORANGE, linewidth=3, label=f"Riesgo/churn (Qini={qini_r:+.3f})")
-    ax.plot([0, 1], [0, ys_u[-1]], color=GRAY, linestyle="--", label="Al azar")
+    ax.plot(xs_u_g, ys_u_g, color=GREEN, linewidth=3, label=f"T-learner (Qini={qini_u:+.3f})")
+    ax.plot(xs_r_g, ys_r_g, color=ORANGE, linewidth=3, label=f"Riesgo/churn (Qini={qini_r:+.3f})")
+    ax.plot([0, 1], [0, ys_u_g[-1]], color=GRAY, linestyle="--", label="Al azar")
     ax.axvline(pct_contactar / 100, color="black", linestyle=":", linewidth=1.5)
     ax.text(pct_contactar / 100 + 0.01, ax.get_ylim()[1] * 0.92, f"Contactar {pct_contactar}%", fontsize=9)
     ax.set_xlabel("% de la base contactada (de prueba)")
@@ -181,14 +190,14 @@ with col_t:
 
     def resaltar(row):
         if row["% contactado"] == pct_opt:
-            return ["background-color: #d9efe5; font-weight: bold"] * len(row)
+            return ["background-color: #d9efe5; color: #11241C; font-weight: bold"] * len(row)
         if row["% contactado"] == pct_contactar:
-            return ["background-color: #fff3cd"] * len(row)
+            return ["background-color: #fff3cd; color: #11241C"] * len(row)
         return [""] * len(row)
 
     st.dataframe(
         tabla.style.apply(resaltar, axis=1).format(
-            {"Valor por cliente ($)": "${:+.2f}", "Valor total ($)": "${:+,.0f}", "Clientes contactados": "{:,}"}),
+            {"Valor por cliente ($)": lambda v: dinero(v), "Valor total ($)": lambda v: dinero(v, 0), "Clientes contactados": "{:,}"}),
         hide_index=True, width="stretch")
     st.success(f"Óptimo con este modelo: contactar al **{pct_opt}%** "
                f"(${tabla.loc[fila_opt, 'Valor total ($)']:,.0f} en prueba).")
