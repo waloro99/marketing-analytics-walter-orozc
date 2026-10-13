@@ -1,0 +1,6 @@
+recomendador,hit_rate_at_3_control,precision_at_3_control,cobertura_de_28,ingreso_incremental_usd_por_cliente,fuente_ingreso
+Popularidad (carrusel probado),0.221,0.078,12,1.11,"Experimento A/B 90 días (IC 95% 0.37 a 1.86)"
+Filtrado por ítem,0.401,0.144,28,pendiente,"Verdad oculta (archivos aún no publicados)"
+Filtrado por cliente (K=30),0.301,0.109,28,pendiente,"Verdad oculta (archivos aún no publicados)"
+Híbrido ítem + popularidad 80/20 (modelo propio),0.408,0.148,28,pendiente,"Verdad oculta (archivos aún no publicados)"
+Final: ítem + respaldo popularidad,0.410,0.148,28,pendiente,"Verdad oculta (archivos aún no publicados)"
